@@ -7,6 +7,7 @@ port(
     clk_100mhz : in std_logic;
     clk_200khz : out std_logic 
     );
+end clkgen200;
 
 architecture behav of clkgen200 is
 

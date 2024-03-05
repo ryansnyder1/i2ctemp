@@ -15,13 +15,14 @@ entity top is
     );
 end top;
 
-architecture behav of top
+architecture behav of top is
     ----component declarations----
     component clkgen200 is
         port(
         clk_100mhz : in std_logic;
         clk_200khz : out std_logic 
         );
+    end component clkgen200;
 
     component i2c_master is
         port(

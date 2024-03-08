@@ -20,7 +20,7 @@ signal s_addrrd : std_logic_vector(7 downto 0) := "10010111"; --Temp sensor addr
 signal sMSB : std_logic_vector(7 downto 0) := "00000000";
 signal sLSB : std_logic_vector(7 downto 0) := "00000000";
 signal s_init_sda : std_logic := '1';  --initial sda bit set to high
-signal s_temp_data_reg : std_logic_vector;
+signal s_temp_data_reg : std_logic_vector(7 downto 0);
 
 --200khz/10khz = 20 -> 20/2 (half the period) = 10 -> 4 bit representation
 signal scount_10k : std_logic_vector(3 downto 0) := "0000";
@@ -29,7 +29,7 @@ signal sclk10 : std_logic := '1';
 begin
 
 ----10khz SCL clock generator process----
-process(clk_200khz)
+process(clk_200khz, rst)
 begin
     if rising_edge(clk_200khz) then
         if rst = '1' then
@@ -49,6 +49,25 @@ end process;
 scl <= sclk10;
 -----------------------------------------
 
+type tstates is (idle, start, addr_b6, addr_b5, addr_b4, addr_b3, addr_b2, 
+addr_b1, addr_b0, rd_bit, rxack, msb_b7, msb_b6, msb_b5, msb_b4, msb_b3, msb_b2, msb_b1,
+msb_b0, txack, lsb_b7, lsb_b6, lsb_b5, lsb_b4, lsb_b3, lsb_b2, lsb_b1, lsb_b0, txnack);
+signal sstates : tstates;
+signal s_HTL : std_logic_vector(11 downto 0) := (others => '0'); --counter for timing period between idle and wait and high to low transition for start condition on sda line.
+signal sstatecnt : std_logic_vector(11 downto 0) := (others => '0');
+
+
+----State Transitions----
+process(clk_200khz, rst)
+begin
+    if rising_edge(clk_200khz) then
+        if rst = '1' then
+            sstates <= start;
+            s_HTL <= X"7d0"; --10 ms period between idle and start state -> 2000 ticks
+        else
+        end if;
+    end if;
+end process;
 
 
 end architecture behav;

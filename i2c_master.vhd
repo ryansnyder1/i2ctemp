@@ -19,7 +19,8 @@ architecture behav of i2c_master is
 signal s_addrrd : std_logic_vector(7 downto 0) := "10010111"; --Temp sensor address (0x4b) + read bit (1) = 0x97
 signal sMSB : std_logic_vector(7 downto 0) := "00000000";
 signal sLSB : std_logic_vector(7 downto 0) := "00000000";
-signal s_init_sda : std_logic := '1';  --initial sda bit set to high
+signal sda_out : std_logic := '1';  --initial sda bit set to high
+signal sda_in : std_logic;
 signal s_temp_data_reg : std_logic_vector(7 downto 0);
 
 --200khz/10khz = 20 -> 20/2 (half the period) = 10 -> 4 bit representation
@@ -65,9 +66,117 @@ begin
             sstates <= start;
             s_HTL <= X"7d0"; --10 ms period between idle and start state -> 2000 ticks
         else
+            s_HTL <= s_HTL + 1;
+            case sstates is
+               when idle => if s_HTL = X"7cf" then sstates <= start; end if;
+               when start => if s_HTL = X"7dd" then sstates <= addr_b6; end if;  --at 2004 ticks (0x7d4) set sda_out HIGH (Output process block)
+               when addr_b6 => if sstatecnt = X"14" then sstates <= addr_b5; end if;
+               when addr_b5 => if sstatecnt = X"14" then sstates <= addr_b4; end if;
+               when addr_b4 => if sstatecnt = X"14" then sstates <= addr_b3; end if;
+               when addr_b3 => if sstatecnt = X"14" then sstates <= addr_b2; end if;
+               when addr_b2 => if sstatecnt = X"14" then sstates <= addr_b1; end if;
+               when addr_b1 => if sstatecnt = X"14" then sstates <= addr_b0; end if;
+               when addr_b0 => if sstatecnt = X"14" then sstates <= rd_bit; end if;
+               when rd_bit => if sstatecnt = X"14" then sstates <= rxack; end if;
+               when rxack => if sstatecnt = X"14" then sstates <= msb_b7; end if;
+               when msb_b7 => if sstatecnt = X"14" then sstates <= msb_b6; end if;
+               when msb_b6 => if sstatecnt = X"14" then sstates <= msb_b5; end if;
+               when msb_b5 => if sstatecnt = X"14" then sstates <= msb_b4; end if;
+               when msb_b4 => if sstatecnt = X"14" then sstates <= msb_b3; end if;
+               when msb_b3 => if sstatecnt = X"14" then sstates <= msb_b2; end if;
+               when msb_b2 => if sstatecnt = X"14" then sstates <= msb_b1; end if;
+               when msb_b1 => if sstatecnt = X"14" then sstates <= msb_b0; end if;
+               when msb_b0 => if sstatecnt = X"14" then sstates <= txack; end if;
+
+               when txack => if sstatecnt = X"14" then sstates <= lsb_b7; end if;
+               when lsb_b7 => if sstatecnt = X"14" then sstates <= lsb_b6; end if;
+               when lsb_b6 => if sstatecnt = X"14" then sstates <= lsb_b5; end if;
+               when lsb_b5 => if sstatecnt = X"14" then sstates <= lsb_b4; end if;
+               when lsb_b4 => if sstatecnt = X"14" then sstates <= lsb_b3; end if;
+               when lsb_b3 => if sstatecnt = X"14" then sstates <= lsb_b2; end if;
+               when lsb_b2 => if sstatecnt = X"14" then sstates <= lsb_b1; end if;
+               when lsb_b1 => if sstatecnt = X"14" then sstates <= lsb_b0; end if;
+               when lsb_b0 => if sstatecnt = X"14" then sstates <= txnack; end if;
+               when txnack => if sstatecnt = X"14" then s_HTL <= X"7d0"; sstates <= start; end if;
+            end case;
         end if;
+        
     end if;
 end process;
+
+----Counter Process---
+process(clk_200khz, rst)
+begin 
+  if rising_edge(clk_200khz) then
+    if rst = '1' then 
+        sstatecnt <= X"00";
+    else
+        case sstates is
+            when idle|start => sstatecnt <= (others => '0');
+            when others => sstatecnt <= sstatecnt + '1';
+        end case;
+    end if;
+  end if;
+end process;
+
+sda_in <= sda;
+
+----State I/O----
+process(sstates)
+begin
+    case sstates is
+        when start => if s_HTL = X"7d4" then sda_out <= '1'; end if;
+        when addr_b6 => sda_out <= s_addrrd(7);
+        when addr_b5 => sda_out <= s_addrrd(6);
+        when addr_b4 => sda_out <= s_addrrd(5);
+        when addr_b3 => sda_out <= s_addrrd(4);
+        when addr_b2 => sda_out <= s_addrrd(3);
+        when addr_b1 => sda_out <= s_addrrd(2);
+        when addr_b0 => sda_out <= s_addrrd(1);
+        when rd_bit => sda_out <= s_addrrd(0);
+        --------------------------------------
+        when msb_b7 => sMSB(7) <= sda_in;
+        when msb_b6 => sMSB(6) <= sda_in;
+        when msb_b5 => sMSB(5) <= sda_in;
+        when msb_b4 => sMSB(4) <= sda_in;
+        when msb_b3 => sMSB(3) <= sda_in;
+        when msb_b2 => sMSB(2) <= sda_in;
+        when msb_b1 => sMSB(1) <= sda_in;
+        when msb_b0 => sMSB(0) <= sda_in;
+        when lsb_b7 => sLSB(7) <= sda_in;
+        when lsb_b6 => sLSB(6) <= sda_in;
+        when lsb_b5 => sLSB(5) <= sda_in;
+        when lsb_b4 => sLSB(4) <= sda_in;
+        when lsb_b3 => sLSB(3) <= sda_in;
+        when lsb_b2 => sLSB(2) <= sda_in;
+        when lsb_b1 => sLSB(1) <= sda_in;
+        when lsb_b0 => sLSB(0) <= sda_in; sda_out <= '1'; -- ???
+        when txnack => s_temp_data_reg <= sMSB(6 downto 0) & sLSB(7);  -- send converted result
+        ----------------------------------
+        when others => null;
+    end case;
+end process;
+
+--process(clk_200khz, sstates)
+--begin
+--    if rising_edge(clk_200khz) then
+--        if sstates = txnack then 
+--            s_temp_data_reg <= sMSB(6 downto 0) & sLSB(7);  -- send converted result
+--        end if;
+--    end if;
+--end process;
+
+----SDA Direction----
+process(sda_dir, sda_out)
+begin
+    if sda_dir = '1' then 
+        sda <= sda_out;
+    else
+        sda <= 'Z';
+    end if;
+end process;
+
+
 
 
 end architecture behav;

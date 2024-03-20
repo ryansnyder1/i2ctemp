@@ -30,7 +30,7 @@ architecture behav of top is
             rst : in std_logic;
             sda : inout std_logic;
             tmp : out std_logic_vector(7 downto 0);
-            sda_dir : out std_logic;
+            sda_dir : inout std_logic;
             scl : out std_logic
         );
     end component i2c_master;

@@ -1,6 +1,7 @@
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity i2c_master is 
         port(
@@ -8,7 +9,7 @@ entity i2c_master is
             rst : in std_logic;
             sda : inout std_logic;
             tmp : out std_logic_vector(7 downto 0);
-            sda_dir : out std_logic;
+            sda_dir : inout std_logic;
             scl : out std_logic
         );
 end i2c_master;
@@ -26,6 +27,13 @@ signal s_temp_data_reg : std_logic_vector(7 downto 0);
 --200khz/10khz = 20 -> 20/2 (half the period) = 10 -> 4 bit representation
 signal scount_10k : std_logic_vector(3 downto 0) := "0000";
 signal sclk10 : std_logic := '1';
+
+type tstates is (idle, start, addr_b6, addr_b5, addr_b4, addr_b3, addr_b2, addr_b1, addr_b0, rd_bit, rxack, msb_b7, msb_b6, msb_b5, msb_b4, msb_b3, msb_b2, msb_b1, msb_b0, txack, lsb_b7, lsb_b6, lsb_b5, lsb_b4, lsb_b3, lsb_b2, lsb_b1, lsb_b0, txnack);
+signal sstates : tstates;
+signal s_HTL : std_logic_vector(11 downto 0) := (others => '0'); --counter for timing period between idle and wait and high to low transition for start condition on sda line.
+signal sstatecnt : std_logic_vector(11 downto 0) := (others => '0');
+
+signal ssda_dir : std_logic;
 
 begin
 
@@ -50,12 +58,7 @@ end process;
 scl <= sclk10;
 -----------------------------------------
 
-type tstates is (idle, start, addr_b6, addr_b5, addr_b4, addr_b3, addr_b2, 
-addr_b1, addr_b0, rd_bit, rxack, msb_b7, msb_b6, msb_b5, msb_b4, msb_b3, msb_b2, msb_b1,
-msb_b0, txack, lsb_b7, lsb_b6, lsb_b5, lsb_b4, lsb_b3, lsb_b2, lsb_b1, lsb_b0, txnack);
-signal sstates : tstates;
-signal s_HTL : std_logic_vector(11 downto 0) := (others => '0'); --counter for timing period between idle and wait and high to low transition for start condition on sda line.
-signal sstatecnt : std_logic_vector(11 downto 0) := (others => '0');
+
 
 
 ----State Transitions----
@@ -166,17 +169,27 @@ end process;
 --    end if;
 --end process;
 
-----SDA Direction----
-process(sda_dir, sda_out)
+----Setting SDA direction signal----
+process(sstates)
 begin
-    if sda_dir = '1' then 
-        sda <= sda_out;
+    if(sstates = idle or sstates = start or sstates = addr_b6 or sstates = addr_b5 or sstates = addr_b4 or sstates = addr_b3 or sstates = addr_b2 or sstates = addr_b1 or sstates = addr_b0 or sstates = rd_bit or sstates = txack or sstates = txnack) then --in states where master is sending data -> set sda direction to 1 for outputting
+        sda_dir <= '1';
     else
-        sda <= 'Z';
+        sda_dir <= '0'; --in other states set sda direction to 0 to act as an input for master to receive data from slave
     end if;
 end process;
 
+----SDA Direction for Output----
+process(sda_dir, sda_out)
+begin
+    if sda_dir = '1' then 
+        sda <= sda_out; --allow master to send
+    else
+        sda <= 'Z'; --allow master to receive -> set to high impedence state
+    end if;
+end process;
 
+sda_in <= sda;
 
 
 end architecture behav;
